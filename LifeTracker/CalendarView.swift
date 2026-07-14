@@ -7,6 +7,7 @@ struct CalendarView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \CalendarEvent.createdAt) private var events: [CalendarEvent]
     @Query private var assessments: [Assessment]
+    @ObservedObject private var google = GoogleCalendarService.shared
 
     @State private var visibleMonth: Date = .now
     @State private var selectedDay: Date = Calendar.current.startOfDay(for: .now)
@@ -20,7 +21,8 @@ struct CalendarView: View {
             Divider().opacity(0.3)
             DayEventsPanel(day: selectedDay,
                            events: eventsByDay[selectedDay] ?? [],
-                           assessments: assessmentsByDay[selectedDay] ?? [])
+                           assessments: assessmentsByDay[selectedDay] ?? [],
+                           googleEvents: googleEventsByDay[selectedDay] ?? [])
                 .frame(width: 300)
         }
         .background(Color.pagePink)
@@ -31,12 +33,61 @@ struct CalendarView: View {
 
     private var monthSection: some View {
         VStack(spacing: 12) {
+            googleBar
             monthHeader
             weekdayHeader
             grid
             Spacer(minLength: 0)
         }
         .padding()
+    }
+
+    /// Connect / status bar for Google Calendar.
+    private var googleBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "calendar.badge.clock")
+                .foregroundStyle(Color.inkOnPink.opacity(0.6))
+            if google.isConnected {
+                Text(google.status.isEmpty ? "Google Calendar connected" : google.status)
+                    .font(.caption)
+                    .foregroundStyle(Color.inkOnPink.opacity(0.7))
+                Spacer()
+                Button {
+                    Task { await google.fetchEvents() }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.inkOnPink)
+                .disabled(google.isBusy)
+                Button("Disconnect") { google.disconnect() }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(Color.expenseRose)
+            } else {
+                Text(google.status.isEmpty ? "Show your Google Calendar events here" : google.status)
+                    .font(.caption)
+                    .foregroundStyle(Color.inkOnPink.opacity(0.7))
+                Spacer()
+                Button {
+                    google.connect()
+                } label: {
+                    Label("Connect Google Calendar", systemImage: "link")
+                        .font(.caption.bold())
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Color.googleBlue, in: Capsule())
+                        .foregroundStyle(Color.inkOnPink)
+                }
+                .buttonStyle(.plain)
+                .disabled(google.isBusy)
+            }
+            if google.isBusy {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(.white, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var monthHeader: some View {
@@ -79,6 +130,7 @@ struct CalendarView: View {
                     date: date,
                     events: eventsByDay[cal.startOfDay(for: date)] ?? [],
                     assessments: assessmentsByDay[cal.startOfDay(for: date)] ?? [],
+                    googleEvents: googleEventsByDay[cal.startOfDay(for: date)] ?? [],
                     inMonth: cal.isDate(date, equalTo: visibleMonth, toGranularity: .month),
                     isToday: cal.isDateInToday(date),
                     isSelected: cal.isDate(date, inSameDayAs: selectedDay)
@@ -111,6 +163,18 @@ struct CalendarView: View {
                 case let (x?, y?): return x < y
                 }
             }
+        }
+        return map
+    }
+
+    /// Groups Google Calendar events by their day for quick lookup.
+    private var googleEventsByDay: [Date: [GoogleEvent]] {
+        var map: [Date: [GoogleEvent]] = [:]
+        for e in google.events {
+            map[cal.startOfDay(for: e.start), default: []].append(e)
+        }
+        for key in map.keys {
+            map[key]?.sort { $0.start < $1.start }
         }
         return map
     }
@@ -156,16 +220,38 @@ struct DayCell: View {
     let date: Date
     let events: [CalendarEvent]
     let assessments: [Assessment]
+    let googleEvents: [GoogleEvent]
     let inMonth: Bool
     let isToday: Bool
     let isSelected: Bool
+
+    private struct Chip: Identifiable {
+        let id = UUID()
+        let title: String
+        let color: Color
+        let icon: String?
+    }
 
     private var dayNumber: String {
         "\(Calendar.current.component(.day, from: date))"
     }
 
-    /// How many items total, and how many we can show (up to 2).
-    private var totalItems: Int { assessments.count + events.count }
+    /// All items for the day: exams first, then Google events, then local events.
+    private var chips: [Chip] {
+        var result: [Chip] = []
+        result += assessments.map {
+            Chip(title: $0.title,
+                 color: Color(hex: $0.course?.colorHex ?? "F3D0D7"),
+                 icon: "graduationcap.fill")
+        }
+        result += googleEvents.map {
+            Chip(title: $0.title, color: Color.googleBlue, icon: nil)
+        }
+        result += events.map {
+            Chip(title: $0.title, color: Color.hoverPink, icon: nil)
+        }
+        return result
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -175,17 +261,12 @@ struct DayCell: View {
                 .frame(width: 24, height: 24)
                 .background(isToday ? Color.brandPink : Color.clear, in: Circle())
 
-            // Exams first (with class color + cap icon), then events. Max 2 shown.
-            ForEach(Array(assessments.prefix(2))) { exam in
-                chip(exam.title,
-                     color: Color(hex: exam.course?.colorHex ?? "F3D0D7"),
-                     isExam: true)
+            // Up to two chips, then a "+N more" overflow.
+            ForEach(chips.prefix(2)) { item in
+                chipView(item.title, color: item.color, icon: item.icon)
             }
-            ForEach(Array(events.prefix(max(0, 2 - assessments.count)))) { event in
-                chip(event.title, color: Color.hoverPink, isExam: false)
-            }
-            if totalItems > 2 {
-                Text("+\(totalItems - 2) more")
+            if chips.count > 2 {
+                Text("+\(chips.count - 2) more")
                     .font(.system(size: 9))
                     .foregroundStyle(Color.inkOnPink.opacity(0.6))
             }
@@ -203,10 +284,10 @@ struct DayCell: View {
         .contentShape(Rectangle())
     }
 
-    private func chip(_ title: String, color: Color, isExam: Bool) -> some View {
+    private func chipView(_ title: String, color: Color, icon: String?) -> some View {
         HStack(spacing: 2) {
-            if isExam {
-                Image(systemName: "graduationcap.fill").font(.system(size: 7))
+            if let icon {
+                Image(systemName: icon).font(.system(size: 7))
             }
             Text(title).lineLimit(1)
         }
@@ -224,6 +305,7 @@ struct DayEventsPanel: View {
     let day: Date
     let events: [CalendarEvent]
     let assessments: [Assessment]
+    let googleEvents: [GoogleEvent]
 
     @State private var newTitle = ""
     @State private var newAllDay = true
@@ -258,6 +340,30 @@ struct DayEventsPanel: View {
                         .padding(.horizontal, 10).padding(.vertical, 8)
                         .background(Color(hex: exam.course?.colorHex ?? "F3D0D7").opacity(0.35),
                                     in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+
+            // Google Calendar events on this day (read-only)
+            if !googleEvents.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(googleEvents) { gEvent in
+                        HStack(spacing: 8) {
+                            Circle().fill(Color.googleBlue).frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(gEvent.title)
+                                    .font(.callout)
+                                    .foregroundStyle(Color.inkOnPink)
+                                Text(gEvent.isAllDay
+                                     ? "All day · Google"
+                                     : "\(gEvent.start.formatted(date: .omitted, time: .shortened)) · Google")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.inkOnPink.opacity(0.6))
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(Color.googleBlue.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
             }

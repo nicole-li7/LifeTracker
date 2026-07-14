@@ -21,4 +21,5 @@ extension Color {
     static let inkOnPink = Color(hex: "6E5647")    // readable warm taupe-brown text
     static let incomeGreen = Color(hex: "5E9E7E")  // income amounts
     static let expenseRose = Color(hex: "C8697A")  // expense amounts
+    static let googleBlue = Color(hex: "CFE0F0")   // Google Calendar event chips
 }
