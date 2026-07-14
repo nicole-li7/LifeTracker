@@ -31,14 +31,21 @@ struct GymView: View {
 
     private var workoutList: some View {
         VStack(spacing: 10) {
-            Button(action: addWorkout) {
+            Menu {
+                ForEach(WorkoutType.allCases) { type in
+                    Button("\(type.rawValue) Day") { newWorkout(type: type) }
+                }
+                Divider()
+                Button("Blank Workout", action: addBlank)
+            } label: {
                 Label("New Workout", systemImage: "plus")
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                     .background(Color.brandPink, in: RoundedRectangle(cornerRadius: 8))
+                    .foregroundStyle(Color.inkOnPink)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.inkOnPink)
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: false, vertical: true)
 
             if workouts.isEmpty {
                 Spacer()
@@ -97,7 +104,11 @@ struct GymView: View {
 
     // MARK: Actions
 
-    private func addWorkout() {
+    private func newWorkout(type: WorkoutType) {
+        selection = buildWorkout(type: type, in: context)
+    }
+
+    private func addBlank() {
         let workout = Workout(name: "Workout", date: .now)
         context.insert(workout)
         selection = workout
@@ -117,7 +128,7 @@ struct WorkoutDetail: View {
     @State private var newExerciseName = ""
 
     private var sortedExercises: [Exercise] {
-        workout.exercises.sorted { $0.createdAt < $1.createdAt }
+        workout.exercises.sorted { ($0.order, $0.createdAt) < ($1.order, $1.createdAt) }
     }
 
     var body: some View {
@@ -158,7 +169,7 @@ struct WorkoutDetail: View {
     private func addExercise() {
         let trimmed = newExerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let exercise = Exercise(name: trimmed)
+        let exercise = Exercise(name: trimmed, order: workout.exercises.count)
         exercise.workout = workout
         context.insert(exercise)
         newExerciseName = ""
@@ -172,16 +183,23 @@ struct ExerciseCard: View {
     let onDelete: () -> Void
 
     private var sortedSets: [ExerciseSet] {
-        exercise.sets.sorted { $0.createdAt < $1.createdAt }
+        exercise.sets.sorted { ($0.order, $0.createdAt) < ($1.order, $1.createdAt) }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                TextField("Exercise name", text: $exercise.name)
-                    .textFieldStyle(.plain)
-                    .font(.headline)
-                    .foregroundStyle(Color.inkOnPink)
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField("Exercise name", text: $exercise.name)
+                        .textFieldStyle(.plain)
+                        .font(.headline)
+                        .foregroundStyle(Color.inkOnPink)
+                    if !exercise.note.isEmpty {
+                        Text(exercise.note)
+                            .font(.caption)
+                            .foregroundStyle(Color.inkOnPink.opacity(0.6))
+                    }
+                }
                 Spacer()
                 Button(action: onDelete) {
                     Image(systemName: "trash").font(.caption)
@@ -219,7 +237,8 @@ struct ExerciseCard: View {
     private func addSet() {
         // Default the new set to the previous one's values for quick logging.
         let last = sortedSets.last
-        let set = ExerciseSet(reps: last?.reps ?? 10, weight: last?.weight ?? 0)
+        let set = ExerciseSet(reps: last?.reps ?? 10, weight: last?.weight ?? 0,
+                              order: exercise.sets.count)
         set.exercise = exercise
         context.insert(set)
     }

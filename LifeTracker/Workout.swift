@@ -21,13 +21,18 @@ final class Workout {
 @Model
 final class Exercise {
     var name: String
+    /// Target scheme shown as guidance, e.g. "3×6–8 to failure".
+    var note: String = ""
+    var order: Int = 0
     var createdAt: Date
     var workout: Workout?
     @Relationship(deleteRule: .cascade, inverse: \ExerciseSet.exercise)
     var sets: [ExerciseSet] = []
 
-    init(name: String) {
+    init(name: String, note: String = "", order: Int = 0) {
         self.name = name
+        self.note = note
+        self.order = order
         self.createdAt = .now
     }
 }
@@ -37,12 +42,14 @@ final class Exercise {
 final class ExerciseSet {
     var reps: Int
     var weight: Double
+    var order: Int = 0
     var createdAt: Date
     var exercise: Exercise?
 
-    init(reps: Int, weight: Double) {
+    init(reps: Int, weight: Double, order: Int = 0) {
         self.reps = reps
         self.weight = weight
+        self.order = order
         self.createdAt = .now
     }
 }
