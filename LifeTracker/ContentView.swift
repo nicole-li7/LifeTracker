@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// The six sections of the app, shown in the sidebar. Adding a new page later
 /// is as simple as adding a case here and a view in `detail(for:)`.
@@ -53,6 +54,8 @@ struct ContentView: View {
             }
         }
         .tint(.brandPink)
+        // Open large (about 90% of the screen), centered.
+        .background(WindowSizer())
         // Keep the app in its light appearance so the warm palette reads correctly
         // even when the Mac is set to dark mode.
         .preferredColorScheme(.light)
@@ -98,6 +101,28 @@ struct ComingSoonPage: View {
         .background(Color.pagePink)
         .navigationTitle(page.rawValue)
     }
+}
+
+/// Sizes the window to ~90% of the screen and centers it when the app opens.
+struct WindowSizer: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            guard let window = view.window,
+                  let screen = window.screen ?? NSScreen.main else { return }
+            let visible = screen.visibleFrame
+            let margin: CGFloat = 0.05          // 5% margin on each side → 90% size
+            let width = visible.width * (1 - margin * 2)
+            let height = visible.height * (1 - margin * 2)
+            let x = visible.minX + (visible.width - width) / 2
+            let y = visible.minY + (visible.height - height) / 2
+            window.setFrame(NSRect(x: x, y: y, width: width, height: height),
+                            display: true, animate: false)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 #Preview {
