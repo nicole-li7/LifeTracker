@@ -15,6 +15,8 @@ struct LifeTrackerApp: App {
             Workout.self,
             Exercise.self,
             ExerciseSet.self,
+            Course.self,
+            ClassMeeting.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {

@@ -71,7 +71,7 @@ struct ContentView: View {
         case .weekly:   WeeklyView()
         case .budget:   BudgetView()
         case .gym:      GymView()
-        case .school:   ComingSoonPage(page: page)
+        case .school:   SchoolView()
         }
     }
 }
