@@ -7,7 +7,7 @@ import Foundation
 /// `com.nicole.LifeTracker`). It looks like:
 ///   123456789-abcdefg.apps.googleusercontent.com
 enum GoogleConfig {
-    static let clientID = "YOUR_CLIENT_ID.apps.googleusercontent.com"
+    static let clientID = "6282853880-lnqbbur2ic9eje3ifi03kmdsmd785sp3.apps.googleusercontent.com"
 
     /// True once a real Client ID has been pasted in above.
     static var isConfigured: Bool {

@@ -109,7 +109,7 @@ final class GoogleCalendarService: ObservableObject {
             isConnected = true
             await fetchEvents()
         } catch {
-            status = "Sign-in failed. Please try again."
+            status = "Sign-in failed: \(error.localizedDescription.prefix(160))"
         }
     }
 
@@ -148,7 +148,12 @@ final class GoogleCalendarService: ObservableObject {
             .map { "\($0.key)=\(Self.formEncode($0.value))" }
             .joined(separator: "&")
             .data(using: .utf8)
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let body = String(data: data, encoding: .utf8) ?? "unknown error"
+            throw NSError(domain: "GoogleToken", code: http.statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: body])
+        }
         return try JSONDecoder().decode(TokenResponse.self, from: data)
     }
 
@@ -165,28 +170,74 @@ final class GoogleCalendarService: ObservableObject {
 
         let now = Date()
         let cal = Calendar.current
-        let timeMin = cal.date(byAdding: .day, value: -31, to: now) ?? now
-        let timeMax = cal.date(byAdding: .day, value: 120, to: now) ?? now
-        let iso = ISO8601DateFormatter()
+        let timeMin = cal.date(byAdding: .day, value: -365, to: now) ?? now
+        let timeMax = cal.date(byAdding: .day, value: 365, to: now) ?? now
 
-        var comps = URLComponents(string: "https://www.googleapis.com/calendar/v3/calendars/primary/events")!
+        let calendarIDs = await fetchCalendarIDs(token: token)
+        var collected: [GoogleEvent] = []
+        var lastError: String?
+
+        for id in calendarIDs {
+            let (evs, err) = await loadEvents(calendarID: id, token: token, from: timeMin, to: timeMax)
+            collected += evs
+            if let err { lastError = err }
+        }
+
+        events = collected.sorted { $0.start < $1.start }
+        if events.isEmpty, let lastError {
+            status = lastError
+        } else {
+            status = "Synced \(events.count) events from \(calendarIDs.count) calendar(s)."
+        }
+    }
+
+    /// Fetches the list of the user's calendar IDs (falls back to "primary").
+    private func fetchCalendarIDs(token: String) async -> [String] {
+        var req = URLRequest(url: URL(string: "https://www.googleapis.com/calendar/v3/users/me/calendarList")!)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                return ["primary"]
+            }
+            let list = try JSONDecoder().decode(CalendarListResponse.self, from: data)
+            let ids = list.items?.map { $0.id } ?? []
+            return ids.isEmpty ? ["primary"] : ids
+        } catch {
+            return ["primary"]
+        }
+    }
+
+    /// Fetches events for one calendar within the time window.
+    /// Returns the events and, if the request failed, an error message.
+    private func loadEvents(calendarID: String, token: String,
+                            from: Date, to: Date) async -> ([GoogleEvent], String?) {
+        let iso = ISO8601DateFormatter()
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        let encodedID = calendarID.addingPercentEncoding(withAllowedCharacters: allowed) ?? calendarID
+
+        var comps = URLComponents(string: "https://www.googleapis.com/calendar/v3/calendars/\(encodedID)/events")!
         comps.queryItems = [
-            .init(name: "timeMin", value: iso.string(from: timeMin)),
-            .init(name: "timeMax", value: iso.string(from: timeMax)),
+            .init(name: "timeMin", value: iso.string(from: from)),
+            .init(name: "timeMax", value: iso.string(from: to)),
             .init(name: "singleEvents", value: "true"),
             .init(name: "orderBy", value: "startTime"),
             .init(name: "maxResults", value: "250"),
         ]
-        var req = URLRequest(url: comps.url!)
+        guard let url = comps.url else { return ([], "Bad URL") }
+        var req = URLRequest(url: url)
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
         do {
-            let (data, _) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                let body = String(data: data, encoding: .utf8)?.prefix(160) ?? ""
+                return ([], "Fetch error \(http.statusCode): \(body)")
+            }
             let resp = try JSONDecoder().decode(EventsResponse.self, from: data)
-            events = resp.items?.compactMap { GoogleEvent(apiEvent: $0) } ?? []
-            status = "Synced \(events.count) events."
+            return (resp.items?.compactMap { GoogleEvent(apiEvent: $0) } ?? [], nil)
         } catch {
-            status = "Couldn't fetch events."
+            return ([], "Fetch failed: \(error.localizedDescription)")
         }
     }
 
@@ -223,6 +274,15 @@ private struct TokenResponse: Decodable {
     let access_token: String
     let expires_in: Int?
     let refresh_token: String?
+}
+
+private struct CalendarListResponse: Decodable {
+    let items: [CalListItem]?
+}
+
+private struct CalListItem: Decodable {
+    let id: String
+    let summary: String?
 }
 
 private struct EventsResponse: Decodable {
