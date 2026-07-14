@@ -66,7 +66,7 @@ struct ContentView: View {
     @ViewBuilder
     private func detail(for page: Page) -> some View {
         switch page {
-        case .calendar: ComingSoonPage(page: page)
+        case .calendar: CalendarView()
         case .todo:     TodoView()
         case .weekly:   WeeklyView()
         case .budget:   ComingSoonPage(page: page)
