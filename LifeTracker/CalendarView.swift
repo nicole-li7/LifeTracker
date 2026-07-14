@@ -6,6 +6,7 @@ import SwiftData
 struct CalendarView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \CalendarEvent.createdAt) private var events: [CalendarEvent]
+    @Query private var assessments: [Assessment]
 
     @State private var visibleMonth: Date = .now
     @State private var selectedDay: Date = Calendar.current.startOfDay(for: .now)
@@ -18,7 +19,8 @@ struct CalendarView: View {
                 .frame(maxWidth: .infinity)
             Divider().opacity(0.3)
             DayEventsPanel(day: selectedDay,
-                           events: eventsByDay[selectedDay] ?? [])
+                           events: eventsByDay[selectedDay] ?? [],
+                           assessments: assessmentsByDay[selectedDay] ?? [])
                 .frame(width: 300)
         }
         .background(Color.pagePink)
@@ -76,6 +78,7 @@ struct CalendarView: View {
                 DayCell(
                     date: date,
                     events: eventsByDay[cal.startOfDay(for: date)] ?? [],
+                    assessments: assessmentsByDay[cal.startOfDay(for: date)] ?? [],
                     inMonth: cal.isDate(date, equalTo: visibleMonth, toGranularity: .month),
                     isToday: cal.isDateInToday(date),
                     isSelected: cal.isDate(date, inSameDayAs: selectedDay)
@@ -112,6 +115,18 @@ struct CalendarView: View {
         return map
     }
 
+    /// Groups all exams/midterms by their day for quick lookup.
+    private var assessmentsByDay: [Date: [Assessment]] {
+        var map: [Date: [Assessment]] = [:]
+        for a in assessments {
+            map[cal.startOfDay(for: a.date), default: []].append(a)
+        }
+        for key in map.keys {
+            map[key]?.sort { $0.date < $1.date }
+        }
+        return map
+    }
+
     private var orderedWeekdaySymbols: [String] {
         let symbols = cal.shortWeekdaySymbols            // index 0 = Sunday
         let first = cal.firstWeekday - 1                 // 0-based
@@ -140,6 +155,7 @@ struct CalendarView: View {
 struct DayCell: View {
     let date: Date
     let events: [CalendarEvent]
+    let assessments: [Assessment]
     let inMonth: Bool
     let isToday: Bool
     let isSelected: Bool
@@ -147,6 +163,9 @@ struct DayCell: View {
     private var dayNumber: String {
         "\(Calendar.current.component(.day, from: date))"
     }
+
+    /// How many items total, and how many we can show (up to 2).
+    private var totalItems: Int { assessments.count + events.count }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -156,18 +175,17 @@ struct DayCell: View {
                 .frame(width: 24, height: 24)
                 .background(isToday ? Color.brandPink : Color.clear, in: Circle())
 
-            // Up to two event chips, then a "+N" overflow.
-            ForEach(events.prefix(2)) { event in
-                Text(event.title)
-                    .font(.system(size: 10))
-                    .lineLimit(1)
-                    .foregroundStyle(Color.inkOnPink)
-                    .padding(.horizontal, 4).padding(.vertical, 1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.hoverPink, in: RoundedRectangle(cornerRadius: 4))
+            // Exams first (with class color + cap icon), then events. Max 2 shown.
+            ForEach(Array(assessments.prefix(2))) { exam in
+                chip(exam.title,
+                     color: Color(hex: exam.course?.colorHex ?? "F3D0D7"),
+                     isExam: true)
             }
-            if events.count > 2 {
-                Text("+\(events.count - 2) more")
+            ForEach(Array(events.prefix(max(0, 2 - assessments.count)))) { event in
+                chip(event.title, color: Color.hoverPink, isExam: false)
+            }
+            if totalItems > 2 {
+                Text("+\(totalItems - 2) more")
                     .font(.system(size: 9))
                     .foregroundStyle(Color.inkOnPink.opacity(0.6))
             }
@@ -184,6 +202,20 @@ struct DayCell: View {
         .opacity(inMonth ? 1 : 0.6)
         .contentShape(Rectangle())
     }
+
+    private func chip(_ title: String, color: Color, isExam: Bool) -> some View {
+        HStack(spacing: 2) {
+            if isExam {
+                Image(systemName: "graduationcap.fill").font(.system(size: 7))
+            }
+            Text(title).lineLimit(1)
+        }
+        .font(.system(size: 10))
+        .foregroundStyle(Color.inkOnPink)
+        .padding(.horizontal, 4).padding(.vertical, 1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color, in: RoundedRectangle(cornerRadius: 4))
+    }
 }
 
 /// The right-hand panel showing the selected day's events, with add/remove.
@@ -191,6 +223,7 @@ struct DayEventsPanel: View {
     @Environment(\.modelContext) private var context
     let day: Date
     let events: [CalendarEvent]
+    let assessments: [Assessment]
 
     @State private var newTitle = ""
     @State private var newAllDay = true
@@ -202,6 +235,32 @@ struct DayEventsPanel: View {
             Text(day.formatted(.dateTime.weekday(.wide).month().day()))
                 .font(.title3.bold())
                 .foregroundStyle(Color.inkOnPink)
+
+            // Exams/midterms on this day (read-only — edit on the School page)
+            if !assessments.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(assessments) { exam in
+                        HStack(spacing: 8) {
+                            Image(systemName: "graduationcap.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color(hex: exam.course?.colorHex ?? "F3D0D7"))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(exam.title)
+                                    .font(.callout)
+                                    .foregroundStyle(Color.inkOnPink)
+                                Text([exam.course?.name, exam.date.formatted(date: .omitted, time: .shortened)]
+                                        .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                                    .font(.caption)
+                                    .foregroundStyle(Color.inkOnPink.opacity(0.6))
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(Color(hex: exam.course?.colorHex ?? "F3D0D7").opacity(0.35),
+                                    in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
 
             // Add area
             VStack(alignment: .leading, spacing: 8) {
