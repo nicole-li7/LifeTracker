@@ -113,6 +113,10 @@ struct CourseDetail: View {
         }
     }
 
+    private var sortedAssessments: [Assessment] {
+        course.assessments.sorted { $0.date < $1.date }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -141,6 +145,23 @@ struct CourseDetail: View {
                     }
                     Button(action: addMeeting) {
                         Label("Add meeting time", systemImage: "plus.circle")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.inkOnPink.opacity(0.8))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 2)
+                }
+
+                // Exams & midterms
+                sectionHeader("Exams & Midterms")
+                VStack(spacing: 6) {
+                    ForEach(sortedAssessments) { assessment in
+                        AssessmentRow(assessment: assessment,
+                                      onDelete: { context.delete(assessment) })
+                    }
+                    Button(action: addAssessment) {
+                        Label("Add exam / midterm", systemImage: "plus.circle")
                             .font(.callout)
                     }
                     .buttonStyle(.plain)
@@ -202,6 +223,72 @@ struct CourseDetail: View {
         let meeting = ClassMeeting(weekday: 0, startTime: start, endTime: end)
         meeting.course = course
         context.insert(meeting)
+    }
+
+    private func addAssessment() {
+        let cal = Calendar.current
+        let date = cal.date(bySettingHour: 9, minute: 0, second: 0, of: .now) ?? .now
+        let assessment = Assessment(title: "Exam", date: date)
+        assessment.course = course
+        context.insert(assessment)
+    }
+}
+
+/// One editable exam/midterm row: title, date & time, room, and a countdown.
+struct AssessmentRow: View {
+    @Bindable var assessment: Assessment
+    let onDelete: () -> Void
+
+    @State private var hovering = false
+
+    private var countdown: String {
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day],
+                                      from: cal.startOfDay(for: .now),
+                                      to: cal.startOfDay(for: assessment.date)).day ?? 0
+        if days == 0 { return "Today" }
+        if days == 1 { return "Tomorrow" }
+        if days > 1 { return "in \(days) days" }
+        return "past"
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "graduationcap.fill")
+                .font(.caption)
+                .foregroundStyle(Color.expenseRose)
+
+            TextField("Exam name", text: $assessment.title)
+                .textFieldStyle(.plain)
+                .foregroundStyle(Color.inkOnPink)
+                .frame(minWidth: 90)
+
+            DatePicker("", selection: $assessment.date,
+                       displayedComponents: [.date, .hourAndMinute])
+                .labelsHidden()
+
+            Text(countdown)
+                .font(.caption.bold())
+                .foregroundStyle(Color.inkOnPink.opacity(0.7))
+
+            TextField("Room", text: $assessment.location)
+                .textFieldStyle(.plain)
+                .foregroundStyle(Color.inkOnPink)
+                .frame(minWidth: 50)
+
+            Spacer()
+
+            if hovering {
+                Button(action: onDelete) {
+                    Image(systemName: "trash").font(.caption)
+                        .foregroundStyle(Color.inkOnPink.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(hovering ? Color.hoverPink : .white, in: RoundedRectangle(cornerRadius: 8))
+        .onHover { hovering = $0 }
     }
 }
 
