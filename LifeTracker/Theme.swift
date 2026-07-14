@@ -19,4 +19,6 @@ extension Color {
     static let barPink = Color(hex: "F3D0D7")      // top bar — soft pink
     static let hoverPink = Color(hex: "F5EEE6")    // subtle hover / cream
     static let inkOnPink = Color(hex: "6E5647")    // readable warm taupe-brown text
+    static let incomeGreen = Color(hex: "5E9E7E")  // income amounts
+    static let expenseRose = Color(hex: "C8697A")  // expense amounts
 }

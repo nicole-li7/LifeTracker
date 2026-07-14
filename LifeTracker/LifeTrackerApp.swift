@@ -11,6 +11,7 @@ struct LifeTrackerApp: App {
             TodoItem.self,
             WeeklyItem.self,
             CalendarEvent.self,
+            BudgetEntry.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
