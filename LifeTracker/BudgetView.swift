@@ -25,6 +25,7 @@ struct BudgetView: View {
             Divider().opacity(0.3)
             ScrollView {
                 VStack(spacing: 16) {
+                    totalBanner
                     summaryTiles
                     addForm
                     entryList
@@ -56,6 +57,36 @@ struct BudgetView: View {
         .font(.title3)
         .foregroundStyle(Color.inkOnPink)
         .padding()
+    }
+
+    // MARK: Running total
+
+    /// Your money on hand: every income minus every expense, up through the end
+    /// of the month you're viewing (so leftover money carries over each month).
+    private var runningTotal: Double {
+        guard let monthEnd = cal.dateInterval(of: .month, for: visibleMonth)?.end else { return 0 }
+        return entries
+            .filter { $0.date < monthEnd }
+            .reduce(0) { $0 + ($1.isIncome ? $1.amount : -$1.amount) }
+    }
+
+    private var totalBanner: some View {
+        VStack(spacing: 4) {
+            Text("Total Balance")
+                .font(.subheadline)
+                .foregroundStyle(Color.inkOnPink.opacity(0.7))
+            Text(money(runningTotal))
+                .font(.system(size: 40, weight: .bold))
+                .foregroundStyle(runningTotal >= 0 ? Color.incomeGreen : Color.expenseRose)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            Text("carried through \(visibleMonth.formatted(.dateTime.month(.wide).year()))")
+                .font(.caption)
+                .foregroundStyle(Color.inkOnPink.opacity(0.5))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .background(.white, in: RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: Summary
