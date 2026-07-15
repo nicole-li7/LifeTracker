@@ -10,6 +10,7 @@ enum Page: String, CaseIterable, Identifiable {
     case budget = "Budget"
     case gym = "Gym"
     case school = "School"
+    case memories = "Memories"
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum Page: String, CaseIterable, Identifiable {
         case .budget:   return "dollarsign.circle"
         case .gym:      return "figure.strengthtraining.traditional"
         case .school:   return "graduationcap"
+        case .memories: return "photo.on.rectangle.angled"
         }
     }
 }
@@ -75,6 +77,7 @@ struct ContentView: View {
         case .budget:   BudgetView()
         case .gym:      GymView()
         case .school:   SchoolView()
+        case .memories: MemoriesView()
         }
     }
 }
