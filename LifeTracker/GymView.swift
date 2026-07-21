@@ -8,6 +8,7 @@ struct GymView: View {
     @Query(sort: \Workout.date, order: .reverse) private var workouts: [Workout]
 
     @State private var selection: Workout?
+    @State private var showProgress = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -25,6 +26,9 @@ struct GymView: View {
         }
         .background(Color.pagePink)
         .navigationTitle("Gym")
+        .sheet(isPresented: $showProgress) {
+            GymProgressView()
+        }
     }
 
     // MARK: Workout list
@@ -46,6 +50,15 @@ struct GymView: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize(horizontal: false, vertical: true)
+
+            Button { showProgress = true } label: {
+                Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(Color.hoverPink, in: RoundedRectangle(cornerRadius: 8))
+                    .foregroundStyle(Color.inkOnPink)
+            }
+            .buttonStyle(.plain)
 
             if workouts.isEmpty {
                 Spacer()

@@ -7,6 +7,7 @@ struct BudgetView: View {
     @Query(sort: \BudgetEntry.date, order: .reverse) private var entries: [BudgetEntry]
 
     @State private var visibleMonth: Date = .now
+    @State private var showInsights = false
 
     // New-entry form state
     @State private var newTitle = ""
@@ -35,6 +36,9 @@ struct BudgetView: View {
         }
         .background(Color.pagePink)
         .navigationTitle("Budget")
+        .sheet(isPresented: $showInsights) {
+            BudgetInsightsView(month: visibleMonth)
+        }
     }
 
     // MARK: Header
@@ -49,6 +53,12 @@ struct BudgetView: View {
             Spacer()
             Button { changeMonth(by: 1) } label: { Image(systemName: "chevron.right") }
                 .buttonStyle(.plain)
+            Button { showInsights = true } label: {
+                Label("Insights", systemImage: "chart.bar.xaxis")
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Color.hoverPink, in: Capsule())
+            }
+            .buttonStyle(.plain)
             Button("This Month") { visibleMonth = .now }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 12).padding(.vertical, 6)
