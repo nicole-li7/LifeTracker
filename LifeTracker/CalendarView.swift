@@ -7,6 +7,7 @@ struct CalendarView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \CalendarEvent.createdAt) private var events: [CalendarEvent]
     @Query private var assessments: [Assessment]
+    @Query(sort: \WeeklyItem.createdAt) private var weeklyItems: [WeeklyItem]
     @ObservedObject private var google = GoogleCalendarService.shared
 
     @State private var visibleMonth: Date = .now
@@ -22,7 +23,8 @@ struct CalendarView: View {
             DayEventsPanel(day: selectedDay,
                            events: eventsByDay[selectedDay] ?? [],
                            assessments: assessmentsByDay[selectedDay] ?? [],
-                           googleEvents: googleEventsByDay[selectedDay] ?? [])
+                           googleEvents: googleEventsByDay[selectedDay] ?? [],
+                           weeklyItems: weeklyItems(on: selectedDay))
                 .frame(width: 300)
         }
         .background(Color.pagePink)
@@ -131,6 +133,7 @@ struct CalendarView: View {
                     events: eventsByDay[cal.startOfDay(for: date)] ?? [],
                     assessments: assessmentsByDay[cal.startOfDay(for: date)] ?? [],
                     googleEvents: googleEventsByDay[cal.startOfDay(for: date)] ?? [],
+                    weeklyItems: weeklyItems(on: date),
                     inMonth: cal.isDate(date, equalTo: visibleMonth, toGranularity: .month),
                     isToday: cal.isDateInToday(date),
                     isSelected: cal.isDate(date, inSameDayAs: selectedDay)
@@ -179,6 +182,19 @@ struct CalendarView: View {
         return map
     }
 
+    /// Weekly Schedule tasks that belong on a given day. Repeating tasks show
+    /// on their weekday every week; one-off tasks only show in the current
+    /// week, since that's the week they were written for and they're cleared
+    /// each Sunday.
+    private func weeklyItems(on date: Date) -> [WeeklyItem] {
+        // WeeklyItem.weekday is 0 = Monday … 6 = Sunday.
+        let index = (cal.component(.weekday, from: date) + 5) % 7
+        let isThisWeek = cal.isDate(date, equalTo: .now, toGranularity: .weekOfYear)
+        return weeklyItems.filter {
+            $0.weekday == index && ($0.repeatsWeekly || isThisWeek)
+        }
+    }
+
     /// Groups all exams/midterms by their day for quick lookup.
     private var assessmentsByDay: [Date: [Assessment]] {
         var map: [Date: [Assessment]] = [:]
@@ -221,6 +237,7 @@ struct DayCell: View {
     let events: [CalendarEvent]
     let assessments: [Assessment]
     let googleEvents: [GoogleEvent]
+    let weeklyItems: [WeeklyItem]
     let inMonth: Bool
     let isToday: Bool
     let isSelected: Bool
@@ -236,7 +253,8 @@ struct DayCell: View {
         "\(Calendar.current.component(.day, from: date))"
     }
 
-    /// All items for the day: exams first, then Google events, then local events.
+    /// All items for the day: exams first, then Google events, local events,
+    /// and finally the Weekly Schedule's tasks.
     private var chips: [Chip] {
         var result: [Chip] = []
         result += assessments.map {
@@ -249,6 +267,11 @@ struct DayCell: View {
         }
         result += events.map {
             Chip(title: $0.title, color: Color.hoverPink, icon: nil)
+        }
+        result += weeklyItems.map {
+            Chip(title: $0.title,
+                 color: Color.weeklyPeach,
+                 icon: $0.isDone ? "checkmark.circle.fill" : "circle")
         }
         return result
     }
@@ -306,6 +329,7 @@ struct DayEventsPanel: View {
     let events: [CalendarEvent]
     let assessments: [Assessment]
     let googleEvents: [GoogleEvent]
+    let weeklyItems: [WeeklyItem]
 
     @State private var newTitle = ""
     @State private var newAllDay = true
@@ -339,6 +363,33 @@ struct DayEventsPanel: View {
                         }
                         .padding(.horizontal, 10).padding(.vertical, 8)
                         .background(Color(hex: exam.course?.colorHex ?? "F3D0D7").opacity(0.35),
+                                    in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+
+            // Weekly Schedule tasks for this weekday (read-only — tick them
+            // off on the Weekly Schedule page)
+            if !weeklyItems.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(weeklyItems) { item in
+                        HStack(spacing: 8) {
+                            Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                                .font(.caption)
+                                .foregroundStyle(Color.inkOnPink.opacity(0.7))
+                            Text(item.title)
+                                .font(.callout)
+                                .strikethrough(item.isDone)
+                                .foregroundStyle(Color.inkOnPink.opacity(item.isDone ? 0.5 : 1))
+                            Spacer()
+                            if item.repeatsWeekly {
+                                Image(systemName: "repeat")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.inkOnPink.opacity(0.5))
+                            }
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .background(Color.weeklyPeach.opacity(0.5),
                                     in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
