@@ -178,9 +178,7 @@ struct MemoriesView: View {
         guard case .success(let urls) = result,
               let url = urls.first,
               let day = pickerDay else { return }
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-        guard let data = downscaledJPEG(from: url) else { return }
+        guard let data = ImageTools.jpegFromPickedFile(url) else { return }
 
         if let existing = photo(for: day) {
             existing.imageData = data
@@ -188,24 +186,6 @@ struct MemoriesView: View {
             context.insert(DailyPhoto(day: day, imageData: data))
         }
         pickerDay = nil
-    }
-
-    /// Loads an image and re-encodes it as a reasonably sized JPEG.
-    private func downscaledJPEG(from url: URL, maxDimension: CGFloat = 1600) -> Data? {
-        guard let image = NSImage(contentsOf: url) else { return nil }
-        let size = image.size
-        guard size.width > 0, size.height > 0 else { return nil }
-        let scale = min(1, maxDimension / max(size.width, size.height))
-        let target = NSSize(width: size.width * scale, height: size.height * scale)
-
-        let resized = NSImage(size: target)
-        resized.lockFocus()
-        image.draw(in: NSRect(origin: .zero, size: target))
-        resized.unlockFocus()
-
-        guard let tiff = resized.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.85])
     }
 
     // MARK: Data helpers
