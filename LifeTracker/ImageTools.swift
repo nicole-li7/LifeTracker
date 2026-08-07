@@ -27,6 +27,15 @@ enum ImageTools {
         return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.85])
     }
 
+    /// Pulls a picture off the clipboard — a screenshot, a copied image, or a
+    /// copied image file — and encodes it for storage. Returns nil when the
+    /// clipboard holds something that isn't a picture.
+    static func jpegFromPasteboard(_ pasteboard: NSPasteboard = .general,
+                                   maxDimension: CGFloat = 1600) -> Data? {
+        guard let image = NSImage(pasteboard: pasteboard) else { return nil }
+        return downscaledJPEG(from: image, maxDimension: maxDimension)
+    }
+
     /// Reads a file the user picked or dragged in, handling the security scope
     /// that sandboxed drops come wrapped in.
     static func jpegFromPickedFile(_ url: URL, maxDimension: CGFloat = 1600) -> Data? {

@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// The six sections of the app, shown in the sidebar. Adding a new page later
+/// The sections of the app, shown in the sidebar. Adding a new page later
 /// is as simple as adding a case here and a view in `detail(for:)`.
 enum Page: String, CaseIterable, Identifiable {
     case calendar = "Calendar"
@@ -9,6 +9,7 @@ enum Page: String, CaseIterable, Identifiable {
     case budget = "Budget"
     case gym = "Gym"
     case school = "School"
+    case notes = "Notes"
     case memories = "Memories"
 
     var id: String { rawValue }
@@ -21,6 +22,7 @@ enum Page: String, CaseIterable, Identifiable {
         case .budget:   return "dollarsign.circle"
         case .gym:      return "figure.strengthtraining.traditional"
         case .school:   return "graduationcap"
+        case .notes:    return "note.text"
         case .memories: return "photo.on.rectangle.angled"
         }
     }
@@ -74,6 +76,7 @@ struct ContentView: View {
         case .budget:   BudgetView()
         case .gym:      GymView()
         case .school:   SchoolView()
+        case .notes:    NotesView()
         case .memories: MemoriesView()
         }
     }
