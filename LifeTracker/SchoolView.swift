@@ -11,7 +11,7 @@ struct SchoolView: View {
     /// `nil` shows the grid of classes; non-nil shows that class's page.
     @State private var openCourse: Course?
 
-    private static let cardWidth: CGFloat = 300
+    private static let cardWidth: CGFloat = 330
     private static let cardSpacing: CGFloat = 22
 
     var body: some View {
@@ -128,8 +128,17 @@ struct SchoolView: View {
         }
     }
 
+    /// The built-in cover photos, handed out to new classes in this order and
+    /// cycled once they run out.
+    private static let stockPhotos = ["gr1", "gr6", "gr3", "gr4", "gr5"]
+
     private func addClass() {
         let course = Course()
+        let name = Self.stockPhotos[courses.count % Self.stockPhotos.count]
+        course.photoData = ImageTools.bundledJPEG(named: name)
+        // A little zoom on the banner so the wide strip shows the middle of the
+        // picture rather than a thin sliver of it.
+        course.bannerScale = 1.3
         context.insert(course)
         openCourse = course
     }
@@ -151,8 +160,9 @@ struct CoverPhoto: View {
 
     enum Mode { case card, banner }
 
-    /// The card's shape.
-    static let cardAspect: CGFloat = 4.0 / 3.0
+    /// The card's shape. Squarer than the banner, so the photo gets more of
+    /// the card's height.
+    static let cardAspect: CGFloat = 6.0 / 5.0
     /// The class page banner's shape. The banner is locked to this ratio rather
     /// than a fixed height, so the crop editor's preview always shows the same
     /// framing the real banner will — a taller or shorter window can't secretly
@@ -457,8 +467,9 @@ struct ClassCard: View {
         CoverPhoto(course: course)
             .aspectRatio(CoverPhoto.cardAspect, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            .padding(.horizontal, 14)
-            .padding(.top, 14)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
     }
 
     private var infoArea: some View {

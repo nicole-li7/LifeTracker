@@ -27,6 +27,16 @@ enum ImageTools {
         return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.85])
     }
 
+    /// Loads one of the app's built-in class cover photos by name.
+    static func bundledJPEG(named name: String, maxDimension: CGFloat = 1600) -> Data? {
+        // Synchronized folders may land flat in Resources or keep their folder,
+        // so try both before giving up.
+        let url = Bundle.main.url(forResource: name, withExtension: "jpg")
+            ?? Bundle.main.url(forResource: name, withExtension: "jpg", subdirectory: "ClassPhotos")
+        guard let url else { return nil }
+        return downscaledJPEG(from: url, maxDimension: maxDimension)
+    }
+
     /// Pulls a picture off the clipboard — a screenshot, a copied image, or a
     /// copied image file — and encodes it for storage. Returns nil when the
     /// clipboard holds something that isn't a picture.
