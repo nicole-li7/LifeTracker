@@ -5,7 +5,6 @@ import AppKit
 /// is as simple as adding a case here and a view in `detail(for:)`.
 enum Page: String, CaseIterable, Identifiable {
     case calendar = "Calendar"
-    case todo = "To-Do"
     case weekly = "Weekly Schedule"
     case budget = "Budget"
     case gym = "Gym"
@@ -18,7 +17,6 @@ enum Page: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .calendar: return "calendar"
-        case .todo:     return "checklist"
         case .weekly:   return "calendar.day.timeline.left"
         case .budget:   return "dollarsign.circle"
         case .gym:      return "figure.strengthtraining.traditional"
@@ -29,7 +27,7 @@ enum Page: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
-    @State private var selection: Page? = .todo
+    @State private var selection: Page? = .weekly
 
     var body: some View {
         NavigationSplitView {
@@ -72,7 +70,6 @@ struct ContentView: View {
     private func detail(for page: Page) -> some View {
         switch page {
         case .calendar: CalendarView()
-        case .todo:     TodoView()
         case .weekly:   WeeklyView()
         case .budget:   BudgetView()
         case .gym:      GymView()
