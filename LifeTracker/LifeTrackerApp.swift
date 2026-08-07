@@ -18,6 +18,7 @@ struct LifeTrackerApp: App {
             Course.self,
             ClassMeeting.self,
             Assessment.self,
+            LectureNote.self,
             DailyPhoto.self,
         ])
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
