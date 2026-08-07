@@ -22,5 +22,5 @@ extension Color {
     static let incomeGreen = Color(hex: "5E9E7E")  // income amounts
     static let expenseRose = Color(hex: "C8697A")  // expense amounts
     static let googleBlue = Color(hex: "CFE0F0")   // Google Calendar event chips
-    static let weeklyPeach = Color(hex: "FBC3C1")  // Weekly Schedule tasks on the calendar
+    static let weeklyPeach = Color(hex: "FDD9D8")  // Weekly Schedule tasks on the calendar
 }
