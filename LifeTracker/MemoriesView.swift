@@ -22,9 +22,7 @@ struct MemoriesView: View {
 
             VStack(spacing: 12) {
                 header
-                weekdayHeader
-                grid
-                Spacer(minLength: 0)
+                monthGrid
             }
             .padding()
 
@@ -67,22 +65,50 @@ struct MemoriesView: View {
         .foregroundStyle(Color.inkOnPink)
     }
 
-    private var weekdayHeader: some View {
-        HStack(spacing: 6) {
-            ForEach(orderedWeekdaySymbols, id: \.self) { symbol in
-                Text(symbol)
-                    .font(.caption.bold())
-                    .foregroundStyle(Color.inkOnPink.opacity(0.6))
-                    .frame(maxWidth: .infinity)
-            }
-        }
-    }
+    /// Landscape shape for each day's tile — wider than it is tall.
+    private static let tileAspect: CGFloat = 4.0 / 3.0
 
-    private var grid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
-            ForEach(gridDays, id: \.self) { date in
-                dayTile(date)
+    /// Weekday names plus the day tiles, sized so the whole month always fits
+    /// the space available. Tiles keep their landscape shape and take whichever
+    /// is smaller — the width a column can have, or the width a row's height
+    /// allows — so a short window shrinks them instead of pushing the last week
+    /// off-screen.
+    private var monthGrid: some View {
+        GeometryReader { geo in
+            let spacing: CGFloat = 6
+            let rows = max(1, gridDays.count / 7)
+            let headerHeight: CGFloat = 18
+            let cellWidth = (geo.size.width - spacing * 6) / 7
+            let cellHeight = (geo.size.height - headerHeight - spacing * CGFloat(rows))
+                / CGFloat(rows)
+            let tileWidth = max(36, min(cellWidth, cellHeight * Self.tileAspect))
+            let tileHeight = tileWidth / Self.tileAspect
+
+            VStack(spacing: spacing) {
+                HStack(spacing: spacing) {
+                    ForEach(orderedWeekdaySymbols, id: \.self) { symbol in
+                        Text(symbol)
+                            .font(.caption.bold())
+                            .foregroundStyle(Color.inkOnPink.opacity(0.6))
+                            .frame(width: tileWidth)
+                    }
+                }
+                .frame(height: headerHeight)
+
+                ForEach(0..<rows, id: \.self) { row in
+                    HStack(spacing: spacing) {
+                        ForEach(0..<7, id: \.self) { column in
+                            let index = row * 7 + column
+                            if index < gridDays.count {
+                                dayTile(gridDays[index])
+                                    .frame(width: tileWidth, height: tileHeight)
+                            }
+                        }
+                    }
+                }
             }
+            .frame(width: tileWidth * 7 + spacing * 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
 
@@ -95,7 +121,6 @@ struct MemoriesView: View {
         let existing = photo(for: date)
 
         return Color.hoverPink
-            .aspectRatio(1, contentMode: .fit)
             .overlay {
                 if let existing, let img = NSImage(data: existing.imageData) {
                     Image(nsImage: img).resizable().scaledToFill()
@@ -206,7 +231,11 @@ struct MemoriesView: View {
         let weekday = cal.component(.weekday, from: monthStart)
         let offset = (weekday - cal.firstWeekday + 7) % 7
         guard let gridStart = cal.date(byAdding: .day, value: -offset, to: monthStart) else { return [] }
-        return (0..<42).compactMap { cal.date(byAdding: .day, value: $0, to: gridStart) }
+        // Only as many whole weeks as this month actually needs — most months
+        // want five rows, not a fixed six.
+        let daysInMonth = cal.range(of: .day, in: .month, for: monthStart)?.count ?? 30
+        let weeks = Int((Double(offset + daysInMonth) / 7).rounded(.up))
+        return (0..<(weeks * 7)).compactMap { cal.date(byAdding: .day, value: $0, to: gridStart) }
     }
 
     private func changeMonth(by months: Int) {

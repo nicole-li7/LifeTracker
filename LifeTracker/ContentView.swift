@@ -114,9 +114,10 @@ struct WindowSizer: NSViewRepresentable {
             guard let window = view.window,
                   let screen = window.screen ?? NSScreen.main else { return }
             let visible = screen.visibleFrame
-            let margin: CGFloat = 0.05          // 5% margin on each side → 90% size
-            let width = visible.width * (1 - margin * 2)
-            let height = visible.height * (1 - margin * 2)
+            // Wide, but not the full height of the screen — a window that runs
+            // top to bottom feels unwieldy and leaves pages stretched out.
+            let width = visible.width * 0.90
+            let height = min(visible.height * 0.86, width * 0.72)
             let x = visible.minX + (visible.width - width) / 2
             let y = visible.minY + (visible.height - height) / 2
             window.setFrame(NSRect(x: x, y: y, width: width, height: height),
