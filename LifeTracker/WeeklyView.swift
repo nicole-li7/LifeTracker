@@ -2,13 +2,18 @@ import SwiftUI
 import SwiftData
 
 /// The Weekly Schedule page: one box per day (Mon–Sun). Tasks accumulate through
-/// the week and clear every Sunday at 12 AM, unless marked to repeat.
+/// the week and clear once Sunday is over, unless marked to repeat.
 struct WeeklyView: View {
     @Environment(\.modelContext) private var context
     @Query private var allItems: [WeeklyItem]
 
     // Remembers which week we last reset for (stored as a number on disk).
-    @AppStorage("weeklyResetWeekStart") private var storedWeekStartRaw: Double = 0
+    // Deliberately a different key from the old "weeklyResetWeekStart": that one
+    // held a Sunday-based week start, and this week's Monday falls after this
+    // week's Sunday, so reusing it would read as "a new week has begun" and wipe
+    // the board on the first launch after the change. A fresh key starts at 0,
+    // which just records the week instead of resetting.
+    @AppStorage("weeklyResetWeekStartMonday") private var storedWeekStartRaw: Double = 0
 
     private let dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday",
                             "Friday", "Saturday", "Sunday"]
@@ -46,7 +51,7 @@ struct WeeklyView: View {
             Text(weekRangeText)
                 .font(.subheadline)
                 .opacity(0.75)
-            Label("Resets Sunday at 12 AM · mark tasks with 🔁 to keep them", systemImage: "arrow.triangle.2.circlepath")
+            Label("Resets at the end of Sunday · mark tasks with 🔁 to keep them", systemImage: "arrow.triangle.2.circlepath")
                 .font(.caption)
                 .opacity(0.6)
                 .padding(.top, 2)
@@ -64,10 +69,13 @@ struct WeeklyView: View {
         return (calWeekday + 5) % 7
     }
 
-    /// The Sunday-at-midnight that starts the week containing `date`.
+    /// The Monday-at-midnight that starts the week containing `date`. Monday
+    /// rather than Sunday so the week turns over at the *end* of Sunday — the
+    /// day boxes run Mon–Sun, and starting the week on Sunday wiped that last
+    /// box just as Sunday was beginning.
     private func weekStart(for date: Date) -> Date {
         var cal = Calendar.current
-        cal.firstWeekday = 1 // 1 = Sunday
+        cal.firstWeekday = 2 // 2 = Monday
         return cal.dateInterval(of: .weekOfYear, for: date)?.start
             ?? cal.startOfDay(for: date)
     }
@@ -214,7 +222,7 @@ struct DayTaskRow: View {
             }
             .buttonStyle(.plain)
             .help(item.repeatsWeekly
-                  ? "Repeats weekly — won't be erased on Sunday. Click to stop."
+                  ? "Repeats weekly — won't be erased when the week resets. Click to stop."
                   : "Click to repeat this task every week.")
 
             if hovering {

@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-/// A task on the Weekly Schedule page. Non-repeating items are erased every
-/// Sunday at 12 AM; repeating items stay (and get unchecked for the new week).
+/// A task on the Weekly Schedule page. Non-repeating items are erased once
+/// Sunday is over; repeating items stay (and get unchecked for the new week).
 @Model
 final class WeeklyItem {
     var title: String
