@@ -11,7 +11,7 @@ struct SchoolView: View {
     /// `nil` shows the grid of classes; non-nil shows that class's page.
     @State private var openCourse: Course?
 
-    private static let cardWidth: CGFloat = 330
+    private static let cardWidth: CGFloat = ClassCard.cardWidth
     private static let cardSpacing: CGFloat = 22
 
     var body: some View {
@@ -25,6 +25,23 @@ struct SchoolView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.pagePink)
         .navigationTitle("School")
+        .onAppear(perform: backfillMissingCovers)
+    }
+
+    /// Classes made before the built-in covers existed have no picture at all,
+    /// so they sit there as an empty grey placeholder. Hand each one a stock
+    /// photo. Runs once ever — after that, a photo removed on purpose stays
+    /// removed rather than growing back on the next visit.
+    private func backfillMissingCovers() {
+        let key = "didBackfillClassCovers"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+
+        for (index, course) in courses.enumerated() where course.photoData == nil {
+            course.photoData = ImageTools.bundledJPEG(
+                named: Self.stockPhotos[index % Self.stockPhotos.count])
+            course.bannerScale = 1.3
+        }
     }
 
     // MARK: - Grid of classes
@@ -63,19 +80,22 @@ struct SchoolView: View {
             } else {
                 GeometryReader { geo in
                     // Cards keep a fixed width and start at the left edge, so
-                    // they don't stretch as the window resizes.
+                    // they don't stretch as the window resizes. The column count
+                    // follows the window, not how many classes there are — tying
+                    // it to the class count and then pinning the grid to a
+                    // computed width let SwiftUI squeeze the "fixed" columns, so
+                    // every card got smaller as soon as a second one appeared.
                     let available = max(0, geo.size.width - 48)
-                    let fitting = max(1, Int((available + Self.cardSpacing)
+                    let columns = max(1, Int((available + Self.cardSpacing)
                                              / (Self.cardWidth + Self.cardSpacing)))
-                    let columns = max(1, min(fitting, courses.count))
-                    let gridWidth = CGFloat(columns) * Self.cardWidth
-                        + CGFloat(columns - 1) * Self.cardSpacing
 
                     ScrollView {
                         LazyVGrid(
                             columns: Array(repeating: GridItem(.fixed(Self.cardWidth),
-                                                               spacing: Self.cardSpacing),
+                                                               spacing: Self.cardSpacing,
+                                                               alignment: .topLeading),
                                            count: columns),
+                            alignment: .leading,
                             spacing: Self.cardSpacing
                         ) {
                             ForEach(courses) { course in
@@ -87,7 +107,6 @@ struct SchoolView: View {
                                     }
                             }
                         }
-                        .frame(width: gridWidth)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
@@ -420,6 +439,12 @@ struct ClassCard: View {
     let course: Course
     let onOpen: () -> Void
 
+    static let cardWidth: CGFloat = 330
+    /// How far the photo sits in from the card's edges.
+    private static let photoInset: CGFloat = 10
+    private static let photoWidth = cardWidth - photoInset * 2
+    private static let photoHeight = photoWidth / CoverPhoto.cardAspect
+
     @State private var hovering = false
 
     private static let dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -462,14 +487,19 @@ struct ClassCard: View {
     }
 
     /// The cover photo across the top, inset so the card shows around it.
-    /// Its 4:3 shape is what makes the whole card taller than wide.
+    /// Its 6:5 shape is what makes the whole card taller than wide.
+    ///
+    /// The size is spelled out rather than left to `.aspectRatio(_:.fit)`:
+    /// `CoverPhoto` is a bare `GeometryReader` with no size of its own, so
+    /// inside the grid's scroll view the fit resolved against an unbounded
+    /// height and left the picture far narrower than the card, with wide empty
+    /// margins either side.
     private var photoArea: some View {
         CoverPhoto(course: course)
-            .aspectRatio(CoverPhoto.cardAspect, contentMode: .fit)
+            .frame(width: Self.photoWidth, height: Self.photoHeight)
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.horizontal, 10)
-            .padding(.top, 10)
+            .padding(.horizontal, Self.photoInset)
+            .padding(.top, Self.photoInset)
     }
 
     private var infoArea: some View {
@@ -497,11 +527,9 @@ struct ClassCard: View {
                 label("graduationcap.fill",
                       "\(next.title.isEmpty ? "Exam" : next.title) — \(Self.countdown(to: next.date))")
             }
-
-            Spacer(minLength: 0)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private func label(_ icon: String, _ text: String) -> some View {
