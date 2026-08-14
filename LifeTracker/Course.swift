@@ -35,6 +35,11 @@ final class Course {
     /// nothing is lost; migrated into a `LectureNote` the first time the class
     /// page is opened.
     var notes: String
+    /// Backing store for ``isArchived``. Optional on purpose: adding this as a
+    /// plain non-optional `Bool` made SwiftData rebuild the Course table on
+    /// launch and drop every class already in the database. An optional
+    /// attribute migrates in place, leaving existing rows alone.
+    var archivedFlag: Bool? = false
     var createdAt: Date
     @Relationship(deleteRule: .cascade, inverse: \ClassMeeting.course)
     var meetings: [ClassMeeting] = []
@@ -42,6 +47,15 @@ final class Course {
     var assessments: [Assessment] = []
     @Relationship(deleteRule: .cascade, inverse: \LectureNote.course)
     var lectures: [LectureNote] = []
+
+    /// A class you're finished with. Archived classes drop out of the Classes
+    /// grid and off the Calendar, but keep everything — notes, exams, photo —
+    /// so old work stays readable behind the "Archived" button. Computed, so
+    /// it isn't stored a second time; ``archivedFlag`` holds the value.
+    var isArchived: Bool {
+        get { archivedFlag ?? false }
+        set { archivedFlag = newValue }
+    }
 
     init(name: String = "New Class",
          instructor: String = "",

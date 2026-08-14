@@ -10,6 +10,13 @@ struct SchoolView: View {
 
     /// `nil` shows the grid of classes; non-nil shows that class's page.
     @State private var openCourse: Course?
+    /// Whether the grid is showing finished classes instead of current ones.
+    @State private var showingArchive = false
+
+    private var activeCourses: [Course] { courses.filter { !$0.isArchived } }
+    private var archivedCourses: [Course] { courses.filter(\.isArchived) }
+    /// The classes the grid is currently listing.
+    private var shownCourses: [Course] { showingArchive ? archivedCourses : activeCourses }
 
     private static let cardWidth: CGFloat = ClassCard.cardWidth
     private static let cardSpacing: CGFloat = 22
@@ -42,37 +49,65 @@ struct SchoolView: View {
                 named: Self.stockPhotos[index % Self.stockPhotos.count])
             course.bannerScale = 1.3
         }
+        // Written out here rather than left to autosave: this only ever runs
+        // once, so a change that doesn't reach disk is a change that's lost.
+        try? context.save()
     }
 
     // MARK: - Grid of classes
 
     private var classGrid: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Classes")
+            HStack(spacing: 10) {
+                Text(showingArchive ? "Archived Classes" : "Classes")
                     .font(.largeTitle.bold())
                     .foregroundStyle(Color.inkOnPink)
                 Spacer()
-                Button(action: addClass) {
-                    Label("Add Class", systemImage: "plus")
-                        .font(.callout.weight(.medium))
-                        .padding(.horizontal, 14).padding(.vertical, 8)
-                        .background(Color.brandPink, in: RoundedRectangle(cornerRadius: 8))
-                        .foregroundStyle(Color.inkOnPink)
+
+                if showingArchive {
+                    Button { showingArchive = false } label: {
+                        Label("Back to Classes", systemImage: "chevron.left")
+                            .font(.callout.weight(.medium))
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                            .foregroundStyle(Color.inkOnPink)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    // Only worth showing once something is actually in there.
+                    if !archivedCourses.isEmpty {
+                        Button { showingArchive = true } label: {
+                            Label("Archived (\(archivedCourses.count))", systemImage: "archivebox")
+                                .font(.callout.weight(.medium))
+                                .padding(.horizontal, 14).padding(.vertical, 8)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                                .foregroundStyle(Color.inkOnPink)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Button(action: addClass) {
+                        Label("Add Class", systemImage: "plus")
+                            .font(.callout.weight(.medium))
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(Color.brandPink, in: RoundedRectangle(cornerRadius: 8))
+                            .foregroundStyle(Color.inkOnPink)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 24).padding(.top, 20).padding(.bottom, 16)
 
-            if courses.isEmpty {
+            if shownCourses.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "graduationcap")
+                    Image(systemName: showingArchive ? "archivebox" : "graduationcap")
                         .font(.system(size: 44))
                         .foregroundStyle(Color.inkOnPink.opacity(0.4))
-                    Text("No classes yet.")
+                    Text(showingArchive ? "Nothing archived." : "No classes yet.")
                         .font(.title3)
                         .foregroundStyle(Color.inkOnPink.opacity(0.6))
-                    Text("Press “Add Class” to make your first one.")
+                    Text(showingArchive
+                         ? "Right-click a class and choose “Archive Class” when you're done with it."
+                         : "Press “Add Class” to make your first one.")
                         .font(.subheadline)
                         .foregroundStyle(Color.inkOnPink.opacity(0.5))
                 }
@@ -98,9 +133,15 @@ struct SchoolView: View {
                             alignment: .leading,
                             spacing: Self.cardSpacing
                         ) {
-                            ForEach(courses) { course in
+                            ForEach(shownCourses) { course in
                                 ClassCard(course: course) { openCourse = course }
                                     .contextMenu {
+                                        Button { setArchived(course, !course.isArchived) } label: {
+                                            Label(course.isArchived ? "Unarchive Class" : "Archive Class",
+                                                  systemImage: course.isArchived
+                                                    ? "tray.and.arrow.up" : "archivebox")
+                                        }
+                                        Divider()
                                         Button(role: .destructive) { delete(course) } label: {
                                             Label("Delete Class", systemImage: "trash")
                                         }
@@ -132,6 +173,19 @@ struct SchoolView: View {
                 .keyboardShortcut(.escape, modifiers: [])
 
                 Spacer()
+
+                Button { setArchived(course, !course.isArchived) } label: {
+                    Label(course.isArchived ? "Unarchive Class" : "Archive Class",
+                          systemImage: course.isArchived ? "tray.and.arrow.up" : "archivebox")
+                        .font(.callout)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 8))
+                        .foregroundStyle(Color.inkOnPink)
+                }
+                .buttonStyle(.plain)
+                .help(course.isArchived
+                      ? "Move this class back in with your current ones."
+                      : "File this class away. Keeps everything — you can read it any time under “Archived”.")
 
                 Button(role: .destructive) { delete(course) } label: {
                     Label("Delete Class", systemImage: "trash")
@@ -165,6 +219,18 @@ struct SchoolView: View {
     private func delete(_ course: Course) {
         if openCourse == course { openCourse = nil }
         context.delete(course)
+    }
+
+    /// Files a class away, or brings it back. Nothing is deleted either way —
+    /// the class keeps its notes, exams and photo, it just moves between the
+    /// two grids. Returns to whichever grid the class now belongs to, so it
+    /// doesn't sit open on a page it's no longer listed on.
+    private func setArchived(_ course: Course, _ archived: Bool) {
+        course.isArchived = archived
+        if openCourse == course {
+            openCourse = nil
+            showingArchive = archived
+        }
     }
 }
 

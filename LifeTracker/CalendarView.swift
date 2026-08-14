@@ -195,10 +195,12 @@ struct CalendarView: View {
         }
     }
 
-    /// Groups all exams/midterms by their day for quick lookup.
+    /// Groups all exams/midterms by their day for quick lookup. Exams belonging
+    /// to an archived class are left out — that class is finished, so its dates
+    /// shouldn't keep showing up on the calendar.
     private var assessmentsByDay: [Date: [Assessment]] {
         var map: [Date: [Assessment]] = [:]
-        for a in assessments {
+        for a in assessments where !(a.course?.isArchived ?? false) {
             map[cal.startOfDay(for: a.date), default: []].append(a)
         }
         for key in map.keys {
