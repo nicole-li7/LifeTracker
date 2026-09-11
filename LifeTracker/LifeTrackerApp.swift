@@ -20,6 +20,7 @@ struct LifeTrackerApp: App {
             ClassMeeting.self,
             Assessment.self,
             LectureNote.self,
+            LectureAttachment.self,
             StickyNote.self,
             NoteImage.self,
             DailyPhoto.self,

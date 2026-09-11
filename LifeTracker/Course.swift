@@ -87,11 +87,42 @@ final class LectureNote {
     var isCollapsed: Bool
     var createdAt: Date
     var course: Course?
+    /// Pictures and files pasted, dragged, or uploaded into these notes.
+    @Relationship(deleteRule: .cascade, inverse: \LectureAttachment.lecture)
+    var attachments: [LectureAttachment] = []
 
     init(title: String = "", text: String = "", isCollapsed: Bool = false) {
         self.title = title
         self.text = text
         self.isCollapsed = isCollapsed
+        self.createdAt = .now
+    }
+}
+
+/// Something attached to a lecture's notes — a pasted screenshot of a slide, a
+/// dragged-in diagram, a PDF handout, a problem set. Pictures are shown inline
+/// as thumbnails; everything else appears as a chip you click to open in
+/// whichever app normally handles that kind of file.
+///
+/// The bytes live outside the main database file so a folder of handouts
+/// doesn't slow the rest of the app down.
+@Model
+final class LectureAttachment {
+    /// The file's original name ("week3-slides.pdf"). Pasted pictures, which
+    /// have no name of their own, get a generated one.
+    var filename: String
+    @Attribute(.externalStorage) var fileData: Data
+    /// True when this is a picture we can draw as a thumbnail. Stored rather
+    /// than derived from the extension so the strip doesn't have to re-decode
+    /// the file to lay itself out.
+    var isImage: Bool
+    var createdAt: Date
+    var lecture: LectureNote?
+
+    init(filename: String, fileData: Data, isImage: Bool) {
+        self.filename = filename
+        self.fileData = fileData
+        self.isImage = isImage
         self.createdAt = .now
     }
 }

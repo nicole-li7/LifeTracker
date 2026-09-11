@@ -990,7 +990,10 @@ struct LectureNoteRow: View {
             .first
             .map(String.init)?
             .trimmingCharacters(in: .whitespaces) ?? ""
-        return firstLine.isEmpty ? "Empty" : firstLine
+        if !firstLine.isEmpty { return firstLine }
+        let count = lecture.attachments.count
+        if count > 0 { return count == 1 ? "1 attachment" : "\(count) attachments" }
+        return "Empty"
     }
 
     var body: some View {
@@ -1042,15 +1045,19 @@ struct LectureNoteRow: View {
             }
 
             if !lecture.isCollapsed {
-                TextEditor(text: $lecture.text)
-                    .font(.body)
-                    .foregroundStyle(Color.inkOnPink)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 120)
-                    .padding(8)
-                    .background(Color.pagePink.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 10)
+                VStack(alignment: .leading, spacing: 8) {
+                    TextEditor(text: $lecture.text)
+                        .font(.body)
+                        .foregroundStyle(Color.inkOnPink)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 120)
+                        .padding(8)
+                        .background(Color.pagePink.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+
+                    LectureAttachmentsStrip(lecture: lecture, ownsPasteShortcut: hovering)
+                }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
             }
         }
         .background(hovering ? Color.hoverPink : .white, in: RoundedRectangle(cornerRadius: 8))
