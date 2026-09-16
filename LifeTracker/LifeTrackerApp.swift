@@ -25,7 +25,15 @@ struct LifeTrackerApp: App {
             NoteImage.self,
             DailyPhoto.self,
         ])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // Take a safety copy of the database before opening it, so a bad
+        // launch (or a schema migration gone wrong) can always be undone.
+        StoreLocation.backUpStore()
+        // The database lives in the app's own folder. SwiftData's default
+        // location (~/Library/Application Support/default.store) is shared by
+        // every non-sandboxed SwiftData app on the Mac — including Apple's
+        // own icloudmailagent, which opened it on 2026-09-15, migrated it to
+        // its schema, and dropped every LifeTracker table in the process.
+        let config = ModelConfiguration("LifeTracker", schema: schema, url: StoreLocation.storeURL)
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
@@ -65,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         saveEverything()
+        StoreLocation.backUpStore()
         return .terminateNow
     }
 
