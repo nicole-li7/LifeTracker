@@ -4,10 +4,9 @@ A personal life tracker for macOS: weekly plans, calendar, budget, gym log, scho
 
 ## Demo
 
-![Clicking through LifeTracker: to-dos, weekly schedule, calendar, budget, gym, school and memories](docs/demo.gif)
+![Clicking through LifeTracker: calendar, weekly schedule, budget, gym, school, notes and memories](docs/demo.gif)
 
-Recorded from the interactive demo on my portfolio, a JavaScript port of the app's logic running on sample data. [Try it in your browser](https://nicole-li7.github.io/projects/lifetracker.html).
-
+Recorded from the macOS app itself running on made-up sample data. There's also a browser version on my portfolio: [try it here](https://nicole-li7.github.io/projects/lifetracker.html).
 
 ## Features
 
